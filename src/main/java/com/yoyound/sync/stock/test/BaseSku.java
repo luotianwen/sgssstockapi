@@ -50,20 +50,20 @@ public abstract class BaseSku<M extends BaseSku<M>> extends Model<M> implements 
 	/**
 	 * 售价
 	 */
-	public double getDiscount() {
+	public Double getDiscount() {
 		return get("discount");
 	}
 	/**
 	 * 售价
 	 */
-	public void setPrice(double price) {
+	public void setPrice(Double price) {
 		set("price", price);
 	}
 
 	/**
 	 * 售价
 	 */
-	public double getPrice() {
+	public Double getPrice() {
 		return get("price");
 	}
 
@@ -99,42 +99,42 @@ public abstract class BaseSku<M extends BaseSku<M>> extends Model<M> implements 
 	/**
 	 * 售价
 	 */
-	public void setMarketPrice(double marketPrice) {
+	public void setMarketPrice(Double marketPrice) {
 		set("market_price", marketPrice);
 	}
 
 	/**
 	 * 售价
 	 */
-	public double getMarketPrice() {
+	public Double getMarketPrice() {
 		return getDouble("market_price");
 	}
 
 	/**
 	 * 售价
 	 */
-	public void setProfitDiscount(double profitDiscount) {
+	public void setProfitDiscount(Double profitDiscount) {
 		set("profit_discount", profitDiscount);
 	}
 
 	/**
 	 * 售价
 	 */
-	public double getProfitDiscount() {
+	public Double getProfitDiscount() {
 		return get("profit_discount");
 	}
 
 	/**
 	 * 售价
 	 */
-	public void setSettlementDiscount(double settlementDiscount) {
+	public void setSettlementDiscount(Double settlementDiscount) {
 		set("settlement_discount", settlementDiscount);
 	}
 
 	/**
 	 * 售价
 	 */
-	public double getSettlementDiscount() {
+	public Double getSettlementDiscount() {
 		return getDouble("settlement_discount");
 	}
 
@@ -142,15 +142,15 @@ public abstract class BaseSku<M extends BaseSku<M>> extends Model<M> implements 
 	/**
 	 * 售价
 	 */
-	public void setProfit(double profit) {
+	public void setProfit(Double profit) {
 		set("profit", profit);
 	}
 
 	/**
 	 * 售价
 	 */
-	public double getProfit() {
-		return get("profit");
+	public Double getProfit() {
+		return getDouble("profit");
 	}
 
 
@@ -159,14 +159,14 @@ public abstract class BaseSku<M extends BaseSku<M>> extends Model<M> implements 
 	/**
 	 * 售价
 	 */
-	public void setSettlementPrice(double settlementPrice) {
+	public void setSettlementPrice(Double settlementPrice) {
 		set("settlement_price", settlementPrice);
 	}
 
 	/**
 	 * 售价
 	 */
-	public double getSettlementPrice() {
+	public Double getSettlementPrice() {
 		return getDouble("settlement_price");
 	}
 
