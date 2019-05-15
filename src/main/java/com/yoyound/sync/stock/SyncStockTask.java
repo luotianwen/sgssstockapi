@@ -52,7 +52,7 @@ public class SyncStockTask implements Runnable {
             if (good == null) {
                 return null;
             }
-            List<Record> skus = Db.use("old").find("SELECT s.goods_id as id ,s.stock as num ,s.spec1, s.price as price   from s_goods_sku s where s.goods_id=?", good.getStr("id"));
+            List<Record> skus = Db.use("old").find("SELECT s.goods_id as id ,s.stock as num ,s.spec1, s.price as price   from s_goods_sku s where s.goods_id=? and s.stock>0", good.getStr("id"));
             Record og = Db.use("new").findFirst("select id from  hjmall_goods where name=?", good.getStr("name"));
             List<Record> alldata = new ArrayList<>();
             for (Record s : skus) {
@@ -212,9 +212,13 @@ public class SyncStockTask implements Runnable {
             Db.use("new").update("update hjmall_goods set status=0 where name=?", g.getStr("name"));
            return null;
         }
+        //设置尺码和库存
         Db.use("old").update("update s_goods  set spec1='尺码' , spec2=null where  id=?", g.getStr("id"));
+        Db.use("old").update("update s_goods_sku  set stock=0  where  goods_id=?", g.getStr("id"));
+
 
         Record allsku = Db.use("old").findFirst("select * from s_goods_sku where goods_id=?   limit 1 ", g.getStr("id"));
+       //获取已经有的库存价格数据
         Double discount = null;
         Double price = null;
         Double settlementPrice = null;
@@ -235,6 +239,7 @@ public class SyncStockTask implements Runnable {
                 settlementPrice = s.getMarketprice() * s.getDiscount();
             }
             if (null == allsku) {
+                //没有库存价格就添加
                 Sku su = new Sku();
                 su.setId(UUID.randomUUID().toString().replaceAll("-", ""));
                 su.setGoodsId(g.getStr("id"));
@@ -249,6 +254,7 @@ public class SyncStockTask implements Runnable {
                 log.warn(g.getStr("id") + "sku商品增加了" + su.getId());
             } else {
                 Record sku = Db.use("old").findFirst("select * from s_goods_sku where goods_id=? and  (spec1 =? or spec2=?) ", g.getStr("id"), s.getSize(), s.getSize());
+                //比对已有的sku尺码
                 if (null == sku) {
                     Sku su = new Sku();
                     su.setId(UUID.randomUUID().toString().replaceAll("-", ""));
