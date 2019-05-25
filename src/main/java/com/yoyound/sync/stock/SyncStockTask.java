@@ -16,30 +16,31 @@ public class SyncStockTask implements Runnable {
     @Override
     public void run() {
         //读取同步品牌
-         List<Record> bands = getSyncBrands();
+        log.error("开始同步库存");
+          List<Record> bands = getSyncBrands();
         for (Record b : bands
         ) {
             List<Record> goods = getSyncGoods(b.getStr("id"));
             log.warn(b.getStr("name") + "有" + goods.size() + "商品");
             for (Record g : goods
             ) {
-           /* Record g=new Record();
-            g.set("artNo","5818291-5018");
-            g.set("price","289");
-            g.set("id","4499");
-            g.set("name","JACK WOLFSKIN狼爪男装2018春款舒适透气运动休闲短袖T恤5818291-5018");*/
+            /* Record g=new Record();
+            g.set("artNo","CX5009");
+            g.set("price","299.0");
+            g.set("id","3402");
+            g.set("name","Adidas阿迪达斯男裤2018夏款运动篮球透气梭织跑步五分裤 CX5009");*/
                 try {
 
                     saveOldSku(g);
                     saveNewSku(g);
                 } catch (Exception e) {
-                    e.printStackTrace();
-                    log.error(g.getStr("artNo")+"出错了" + e.getMessage());
+                     e.printStackTrace();
+                    log.error(g.getStr("artNo")+"出错了" + e.toString());
                 }
-           }
+            }
 
         }
-
+        log.error("同步数据完成");
 
     }
 
@@ -48,7 +49,7 @@ public class SyncStockTask implements Runnable {
         int num = 0;
         {
             num = 0;
-            Record good = Db.use("old").findFirst("SELECT g.id as id, g.num as gid,  g.name,g.price,g.market_price,d.details ,g.logo ,g.artNo,b.num from s_goods g ,s_goods_detail d ,s_brand b where g.brand_id=b.id and  d.goods_id=g.id and g.id=?", go.getStr("id"));
+            Record good = Db.use("old").findFirst("SELECT g.id as id, g.num as gid,  g.name,g.price,g.market_price,d.details ,g.logo ,g.artNo,b.num from s_goods g ,s_goods_detail d ,s_brand b where g.state='1' and g.brand_id=b.id and  d.goods_id=g.id and g.id=?", go.getStr("id"));
             if (good == null) {
                 return null;
             }
@@ -150,7 +151,7 @@ public class SyncStockTask implements Runnable {
                     GoodsCat c = new GoodsCat();
                     c.setGoodsId(good.getInt("gid"));
                     c.setStoreId(2);
-                    c.setAddtime(new Long(System.currentTimeMillis() / 1000).intValue());
+                    c.setAddtime((int) (System.currentTimeMillis() / 1000));
                     c.setIsDelete(0);
                     c.setCatId(rs.getInt("num"));
                     c.save();
@@ -159,7 +160,7 @@ public class SyncStockTask implements Runnable {
                 // Record og=Db.use("new").findFirst("select id from  hjmall_goods where id=?",good.getInt("gid"));
                 /* if(null==og) {*/
                 Goods g = new Goods();
-                g.setAddtime(new Long(System.currentTimeMillis()).intValue());
+                g.setAddtime((int) (System.currentTimeMillis() / 1000));
                 g.setStoreId(2);
                 g.setId(good.getInt("gid"));
                 //good
@@ -193,9 +194,11 @@ public class SyncStockTask implements Runnable {
                 g.save();
                 log.warn("goods" + good.getInt("gid")+ "同步商品完成" + good.getStr("artNo") );
             } else {
+                if(num>0){
                 log.warn("goods" + og.getInt("id") + "同步库存完成"+ good.getStr("artNo") );
                 //同步库存
                 Db.use("new").update("update hjmall_goods set attr=?,status=1 where id=? ", JsonKit.toJson(alldata), og.getInt("id"));
+                }
             }
 
 
@@ -206,10 +209,10 @@ public class SyncStockTask implements Runnable {
     private String  saveOldSku(Record g) throws Exception {
         List<Stock> stocks = getSyncStock(g.getStr("artNo"));
         if (stocks.size() == 0) {
-            log.error("下架商品" + g.getStr("artNo"));
+            log.error(g.getStr("artNo")+"下架商品" + g.getStr("name"));
             Db.use("old").update("update s_goods  set state=0,update_date=now() where id=?", g.getStr("id"));
             Db.use("old").update("update s_goods_sku set stock=0 where goods_id=?", g.getStr("id"));
-            Db.use("new").update("update hjmall_goods set status=0 where name=?", g.getStr("name"));
+            Db.use("new").update("update hjmall_goods set status=0 where name=?",g.getStr("name") );
            return null;
         }
         //设置尺码和库存
@@ -219,64 +222,66 @@ public class SyncStockTask implements Runnable {
 
         Record allsku = Db.use("old").findFirst("select * from s_goods_sku where goods_id=?   limit 1 ", g.getStr("id"));
        //获取已经有的库存价格数据
-        Double discount = null;
-        Double price = null;
-        Double settlementPrice = null;
+        Double discount = null, price = null, settlementPrice = null,market_price=null,settlement_discount=null;
         if (null != allsku) {
             discount = allsku.getDouble("discount");
             price = allsku.getDouble("price");
             settlementPrice = allsku.getDouble("settlement_price");
+            market_price= allsku.getDouble("market_price");
+            settlement_discount=allsku.getDouble("settlement_discount");
         }
         for (Stock s : stocks
         ) {
-            if (null == discount) {
-                discount = s.getDiscount() + 2.0;
+            if (null == discount||discount==0d) {
+                 if(8>=s.getDiscount()&&6<=s.getDiscount()){
+                    discount = s.getDiscount() + 2.0;
+                }
+                else {
+                    discount = s.getDiscount() + 2.5;
+                }
             }
-            if (null == price) {
-                price = s.getMarketprice() * discount;
+            if(null==market_price||market_price==0d){
+                market_price=s.getMarketprice();
             }
-            if (null == settlementPrice) {
-                settlementPrice = s.getMarketprice() * s.getDiscount();
+            if (null == price||price==0d) {
+                price = (s.getMarketprice() * discount)/10;
             }
-            if (null == allsku) {
-                //没有库存价格就添加
-                Sku su = new Sku();
-                su.setId(UUID.randomUUID().toString().replaceAll("-", ""));
-                su.setGoodsId(g.getStr("id"));
-                su.setStock(s.getInnernum());
-                su.setSpec1(s.getSize());
-                su.setMarketPrice(s.getMarketprice());
-                su.setDiscount(discount);
-                su.setPrice(price);
-                su.setSettlementPrice(settlementPrice);
-                su.setProfit(su.getPrice() - su.getSettlementPrice());
-                su.save();
-                log.warn(g.getStr("id") + "sku商品增加了" + su.getId());
-            } else {
+            if(null==settlement_discount){
+                settlement_discount=s.getDiscount();
+            }
+            if (null == settlementPrice||settlementPrice==0d) {
+                settlementPrice = (s.getMarketprice() * s.getDiscount())/10;
+            }
+
+
                 Record sku = Db.use("old").findFirst("select * from s_goods_sku where goods_id=? and  (spec1 =? or spec2=?) ", g.getStr("id"), s.getSize(), s.getSize());
                 //比对已有的sku尺码
-                if (null == sku) {
                     Sku su = new Sku();
-                    su.setId(UUID.randomUUID().toString().replaceAll("-", ""));
                     su.setGoodsId(g.getStr("id"));
                     su.setStock(s.getInnernum());
                     su.setSpec1(s.getSize());
-                    su.setDiscount(allsku.getDouble("discount"));
-                    su.setMarketPrice(allsku.getDouble("market_price"));
-                    su.setSettlementDiscount(allsku.getDouble("settlement_discount"));
-                    su.setPrice(allsku.getDouble("price"));
-                    su.setSettlementPrice(allsku.getDouble("settlement_price"));
-                    su.setProfit(allsku.getDouble("profit"));
+                    su.setDiscount(discount);
+                    su.setMarketPrice(market_price);
+                    su.setSettlementDiscount(settlement_discount);
+                    su.setPrice(price);
+                    su.setSettlementPrice(settlementPrice);
+                    su.setProfit(su.getPrice() - su.getSettlementPrice());
+                if (null == sku) {
+                    su.setId(UUID.randomUUID().toString().replaceAll("-", ""));
                     su.save();
                     log.warn(g.getStr("id") + "没有sku商品增加了" + su.getId());
                 } else {
+                    su.setId(sku.getStr("id"));
+                    su.update();
                     //修改库存
-                    Db.use("old").update("update s_goods_sku set stock=?,spec1=?,spec2=null where id=?", s.getInnernum(), s.getSize(), sku.getStr("id"));
+                    //Db.use("old").update("update s_goods_sku set stock=?,spec1=?,spec2=null where id=?", s.getInnernum(), s.getSize(), sku.getStr("id"));
                     log.warn(g.getStr("id") + "修改库存" + sku.getStr("id"));
 
                 }
-            }
         }
+
+        //审核通过
+        Db.use("old").update("update s_goods  set pass=1,state=1,update_date=now(),price=? where id=?",price, g.getStr("id"));
         return null;
     }
 
@@ -292,12 +297,11 @@ public class SyncStockTask implements Runnable {
         //是否支持退货
         map.put("return_type", "1");
          String str = Cont.post(Cont.GROUPSTOCK, map);
-       /* Map map2 = new HashMap();
+         Map map2 = new HashMap();
         map2.put("articleno", articleno.trim());
-       String str=Cont.post("http://open.api.yoyound.com/openapi/getInventoryList?sign=e509e958b76ae2667326680c5679e1",map2);*/
+        //String str=Cont.post("http://open.api.yoyound.com/openapi/getInventoryList?sign=e509e958b76ae2667326680c5679e1",map2);
         // String str = "{\"total\":28,\"page\":\"1\",\"rows\":[{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"L\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.2\",\"size\":\"L\",\"innerNum\":\"240\",\"wareHouseName\":\"天马总仓1仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.2\",\"size\":\"M\",\"innerNum\":\"226\",\"wareHouseName\":\"天马总仓1仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"S\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.2\",\"size\":\"S\",\"innerNum\":\"195\",\"wareHouseName\":\"天马总仓1仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"XL\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.2\",\"size\":\"XL\",\"innerNum\":\"118\",\"wareHouseName\":\"天马总仓1仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"M\",\"innerNum\":\"135\",\"wareHouseName\":\"山东狼爪C仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"S\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"S\",\"innerNum\":\"234\",\"wareHouseName\":\"山东狼爪C仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"L\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"4.7\",\"size\":\"L\",\"innerNum\":\"30\",\"wareHouseName\":\"长春户外仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"4.7\",\"size\":\"M\",\"innerNum\":\"60\",\"wareHouseName\":\"长春户外仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"S\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"4.7\",\"size\":\"S\",\"innerNum\":\"30\",\"wareHouseName\":\"长春户外仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"L\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"L\",\"innerNum\":\"66\",\"wareHouseName\":\"山东狼爪\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"M\",\"innerNum\":\"28\",\"wareHouseName\":\"山东狼爪\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"S\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"S\",\"innerNum\":\"11\",\"wareHouseName\":\"山东狼爪\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"XL\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"XL\",\"innerNum\":\"31\",\"wareHouseName\":\"山东狼爪\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"L\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"L\",\"innerNum\":\"43\",\"wareHouseName\":\"山东乐斯菲斯2仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"M\",\"innerNum\":\"54\",\"wareHouseName\":\"山东乐斯菲斯2仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"S\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"S\",\"innerNum\":\"40\",\"wareHouseName\":\"山东乐斯菲斯2仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"XL\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"XL\",\"innerNum\":\"19\",\"wareHouseName\":\"山东乐斯菲斯2仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"L\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"L\",\"innerNum\":\"19\",\"wareHouseName\":\"山东狼爪E仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"M\",\"innerNum\":\"16\",\"wareHouseName\":\"山东狼爪E仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"S\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"S\",\"innerNum\":\"10\",\"wareHouseName\":\"山东狼爪E仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"L\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"L\",\"innerNum\":\"6\",\"wareHouseName\":\"山东狼爪D仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"M\",\"innerNum\":\"6\",\"wareHouseName\":\"山东狼爪D仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"S\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"S\",\"innerNum\":\"5\",\"wareHouseName\":\"山东狼爪D仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"XL\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"XL\",\"innerNum\":\"8\",\"wareHouseName\":\"山东狼爪D仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"XL\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.3\",\"size\":\"XL\",\"innerNum\":\"9\",\"wareHouseName\":\"山东狼爪E仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"L\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"L\",\"innerNum\":\"93\",\"wareHouseName\":\"山东户外2仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"M\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"M\",\"innerNum\":\"40\",\"wareHouseName\":\"山东户外2仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"},{\"sex\":\"男\",\"cate\":\"冲锋衣\",\"marketprice\":1299.0,\"ukSize\":\"XL\",\"warehouse_goods_no\":\"5118012-6000\",\"brandName\":\"狼爪\",\"discount\":\"5.4\",\"size\":\"XL\",\"innerNum\":\"107\",\"wareHouseName\":\"山东户外2仓\",\"division\":\"服\",\"articleno\":\"5118012-6000\",\"quarter\":\"19Q1\"}]}";
         log.warn("天马仓库数据" + str);
-        //String str="{\"total\":1,\"rows\":[{\"wareHouseName\":\"成都特供仓\",\"sex\":\"男\",\"division\":\"服\",\"marketprice\":348.0,\"ukSize\":\"S\",\"articleno\":\"288254-010\",\"brandName\":\"耐克\",\"discount\":2.3,\"quarter\":\"\",\"innerNum\":500,\"size\":\"S\",\"barcode\":\"4056561268379\"},{\"wareHouseName\":\"成都特供仓\",\"sex\":\"男\",\"division\":\"服\",\"marketprice\":1399.0,\"ukSize\":\"10\",\"articleno\":\"304775-125\",\"brandName\":\"耐克\",\"discount\":10.1,\"quarter\":\"15Q2\",\"innerNum\":500,\"size\":\"10\",\"barcode\":\"4056561268378\"}]}";
         BackData j = JSON.parseObject(str, BackData.class);
         if(StrKit.notBlank(j.error_code)){
             log.error(j.error_info);
@@ -334,8 +338,7 @@ public class SyncStockTask implements Runnable {
      * @return
      */
     private List<Record> getSyncGoods(String brandId) {
-//artNo AH6804-012 price 703 id 8099  name NIKE耐克女鞋2018冬季新款运动鞋华莱士休闲缓震耐磨低帮跑步鞋AH6804-012
-        return Db.use("old").find("SELECT artNo,price,id,name from s_goods where state='1' and del_flag='0' and pass='1' and brand_id='" + brandId + "'");
+        return Db.use("old").find("SELECT artNo,price,id,name from s_goods where state='1' and del_flag='0'   and brand_id='" + brandId + "' order by update_date asc ");
     }
 
 
