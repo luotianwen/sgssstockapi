@@ -37,7 +37,7 @@ public class DemoConfig extends JFinalConfig {
     @Override
     public void onStart() {
         super.onStart();
-        // new SyncStockTask().run();
+        //  new OutDongLiTask().run();
     }
 
     /**

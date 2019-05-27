@@ -228,7 +228,7 @@ public class SyncStockTask implements Runnable {
             price = allsku.getDouble("price");
             settlementPrice = allsku.getDouble("settlement_price");
             market_price= allsku.getDouble("market_price");
-            settlement_discount=allsku.getDouble("settlement_discount");
+           // settlement_discount=allsku.getDouble("settlement_discount");
         }
         for (Stock s : stocks
         ) {
@@ -247,9 +247,9 @@ public class SyncStockTask implements Runnable {
                 price = (s.getMarketprice() * discount)/10;
             }
             if(null==settlement_discount){
-                settlement_discount=s.getDiscount();
+                settlement_discount=s.getDiscount()/10;
             }
-            if (null == settlementPrice||settlementPrice==0d) {
+            if (null == settlement_discount) {
                 settlementPrice = (s.getMarketprice() * s.getDiscount())/10;
             }
 
