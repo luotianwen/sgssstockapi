@@ -197,7 +197,7 @@ public class SyncStockTask implements Runnable {
                 if(num>0){
                 log.warn("goods" + og.getInt("id") + "同步库存完成"+ good.getStr("artNo") );
                 //同步库存
-                Db.use("new").update("update hjmall_goods set attr=?,status=1 where id=? ", JsonKit.toJson(alldata), og.getInt("id"));
+                Db.use("new").update("update hjmall_goods set attr=?,status=1,price=? where id=? ", JsonKit.toJson(alldata), good.getFloat("price"), og.getInt("id"));
                 }
             }
 
@@ -240,16 +240,20 @@ public class SyncStockTask implements Runnable {
                     discount = s.getDiscount() + 2.5;
                 }
             }
+            if(discount>9.9){
+                discount=10d;
+            }
             if(null==market_price||market_price==0d){
                 market_price=s.getMarketprice();
             }
             if (null == price||price==0d) {
                 price = (s.getMarketprice() * discount)/10;
             }
-            if(null==settlement_discount){
+            if(null==settlement_discount||price==0d){
                 settlement_discount=s.getDiscount()/10;
+
             }
-            if (null == settlement_discount) {
+            if (null == settlementPrice||settlementPrice==0d) {
                 settlementPrice = (s.getMarketprice() * s.getDiscount())/10;
             }
 
