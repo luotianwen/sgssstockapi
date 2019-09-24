@@ -174,7 +174,7 @@ public class SyncStockTask implements Runnable {
                 g.setIsDelete(0);
                 g.setAttr(JsonKit.toJson(alldata));
                 g.setService("正品保障,极速发货,7天退换货");
-                g.setSort(1000);
+                g.setSort(good.getInt("gid"));
                 g.setVirtualSales(new Random().nextInt(500) + 1);
 
                 if (logo == null) {
@@ -216,7 +216,7 @@ public class SyncStockTask implements Runnable {
            return null;
         }
         //设置尺码和库存
-        Db.use("old").update("update s_goods  set spec1='尺码' , spec2=null where  id=?", g.getStr("id"));
+        Db.use("old").update("update s_goods  set supplier_id='5e455bfcce0446159af263118fbb2533',spec1='尺码' , spec2=null where  id=?", g.getStr("id"));
         Db.use("old").update("update s_goods_sku  set stock=0  where  goods_id=?", g.getStr("id"));
 
 
@@ -230,41 +230,40 @@ public class SyncStockTask implements Runnable {
             market_price= allsku.getDouble("market_price");
            // settlement_discount=allsku.getDouble("settlement_discount");
         }
+        if (null == discount||discount==0d) {
+            if(8>=stocks.get(0).getDiscount()&&6<=stocks.get(0).getDiscount()){
+                discount = stocks.get(0).getDiscount() + 2.0;
+            }
+            else {
+                discount = stocks.get(0).getDiscount() + 2.5;
+            }
+        }
+        if(discount>9.9){
+            discount=10d;
+        }
+        if(null==market_price||market_price==0d){
+            market_price=stocks.get(0).getMarketprice();
+        }
+        if (null == price||price==0d) {
+            price = (stocks.get(0).getMarketprice() * discount)/10;
+        }
+        if(null==settlement_discount||price==0d){
+            settlement_discount=stocks.get(0).getDiscount()/10;
+
+        }
+        if (null == settlementPrice||settlementPrice==0d) {
+            settlementPrice = (stocks.get(0).getMarketprice() * stocks.get(0).getDiscount())/10;
+        }
+
         for (Stock s : stocks
         ) {
-            if (null == discount||discount==0d) {
-                 if(8>=s.getDiscount()&&6<=s.getDiscount()){
-                    discount = s.getDiscount() + 2.0;
-                }
-                else {
-                    discount = s.getDiscount() + 2.5;
-                }
-            }
-            if(discount>9.9){
-                discount=10d;
-            }
-            if(null==market_price||market_price==0d){
-                market_price=s.getMarketprice();
-            }
-            if (null == price||price==0d) {
-                price = (s.getMarketprice() * discount)/10;
-            }
-            if(null==settlement_discount||price==0d){
-                settlement_discount=s.getDiscount()/10;
-
-            }
-            if (null == settlementPrice||settlementPrice==0d) {
-                settlementPrice = (s.getMarketprice() * s.getDiscount())/10;
-            }
-
-
                 Record sku = Db.use("old").findFirst("select * from s_goods_sku where goods_id=? and  (spec1 =? or spec2=?) ", g.getStr("id"), s.getSize(), s.getSize());
                 //比对已有的sku尺码
                     Sku su = new Sku();
                     su.setGoodsId(g.getStr("id"));
                     su.setStock(s.getInnernum());
                     su.setSpec1(s.getSize());
-                    su.setDiscount(discount);
+                    su.setDiscount(discount/10);
                     su.setMarketPrice(market_price);
                     su.setSettlementDiscount(settlement_discount);
                     su.setPrice(price);
