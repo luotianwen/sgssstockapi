@@ -247,7 +247,7 @@ public class SyncStockTask implements Runnable {
         if (null == price||price==0d) {
             price = (stocks.get(0).getMarketprice() * discount)/10;
         }
-        if(null==settlement_discount||price==0d){
+        if(null==settlement_discount||settlement_discount==0d){
             settlement_discount=stocks.get(0).getDiscount()/10;
 
         }
