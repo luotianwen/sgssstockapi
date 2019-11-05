@@ -282,7 +282,8 @@ public class SyncStockTask implements Runnable {
 
                 }
         }
-
+        //删除库存为0的
+        Db.use("old").delete("delete from s_goods_sku where goods_id=? and stock=0 ", g.getStr("id"));
         //审核通过
         Db.use("old").update("update s_goods  set pass=1,state=1,update_date=now(),price=? where id=?",price, g.getStr("id"));
         return null;
@@ -314,8 +315,13 @@ public class SyncStockTask implements Runnable {
         List<Stock> datass = new ArrayList<>();
         if (j.getRows() != null && j.getRows().size() > 0) {
             List<Stock> ss = j.getRows();
+            double marketprice=ss.get(0).getMarketprice();
+            double discount=ss.get(0).getDiscount();
+
             for (Stock s : ss
             ) {
+                s.setMarketprice(marketprice);
+                s.setDiscount(discount);
                 if (null == dataMap.get(s.getArticleno() + "||" + s.getSize())) {
                     datass.add(s);
                     dataMap.put(s.getArticleno() + "||" + s.getSize(), s);
